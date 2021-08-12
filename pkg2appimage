@@ -55,8 +55,6 @@ set -x
 
 # Check dependencies
 check_dependencies \
-  dpkg \
-  dpkg-deb \
   convert \
   wget \
   grep \
@@ -66,14 +64,9 @@ check_dependencies \
   desktop-file-validate \
   strings
 
-# If the yaml file doesn't exist locally, get it from GitHub
-if [ ! -f "${!#}" ] ; then
-  YAMLFILE=/tmp/_recipe.yml
-  rm -f "$YAMLFILE"
-  wget -q "https://github.com/AppImage/AppImages/raw/${PKG2AICOMMIT}/recipes/${!#}.yml" -O "$YAMLFILE"
-else
-  YAMLFILE=$(readlink -f "${!#}")
-fi
+
+YAMLFILE=$(readlink -f "${!#}")
+
 
 # Lightweight bash-only dpkg-scanpackages replacement
 scanpackages() {
@@ -145,17 +138,8 @@ if [ -d "./$APP.AppDir/" ] ; then
   rm -rf ./$APP.AppDir/
 fi
 
-# Source the bundled functions.sh if it exists
-# in "${HERE}/usr/share/pkg2appimage/functions.sh"
-# or source a user-provided functions.sh if the environment
-# variable FUNCTIONS_SH was set and the file exists
-if [ -e "${HERE}/usr/share/pkg2appimage/functions.sh" ] ; then
-  . "${HERE}/usr/share/pkg2appimage/functions.sh"
-elif [ -z "$FUNCTIONS_SH" ] ; then
-  if [ ! -e functions.sh ] ; then
-    wget -q https://github.com/AppImage/AppImages/raw/${PKG2AICOMMIT}/functions.sh -O ./functions.sh
-  fi
-  . ./functions.sh
+if [ -z "$FUNCTIONS_SH" ] ; then
+  . ../functions.sh
 else
   if [ -e "$FUNCTIONS_SH" ] ; then
     . "$FUNCTIONS_SH"
@@ -172,126 +156,9 @@ if [ ! -z "$ARCH" ] ; then
   OPTIONS="$OPTIONS -o APT::Architecture=$ARCH"
 fi
 
-if [ ! -z "${_ingredients_ghreleases[0]}" ] ; then
-  for GHREPO in "${_ingredients_ghreleases[@]}" ; do
-    wget -q "https://github.com/${GHREPO}/releases/" -O /tmp/gh-release.html
-    DEB=$(cat /tmp/gh-release.html | grep ".deb" | grep x86_64 | head -n 1 | cut -d '"' -f 2)
-    if [ -z "$DEB" ] ; then
-      DEB=$(cat /tmp/gh-release.html | grep ".deb" | grep amd64 | head -n 1 | cut -d '"' -f 2)
-    fi
-    if [ -z "$DEB" ] ; then
-      DEB=$(cat /tmp/gh-release.html | grep ".deb" | grep x64 | head -n 1 | cut -d '"' -f 2)
-    fi
-    if [ -z "$DEB" ] ; then
-      DEB=$(cat /tmp/gh-release.html | grep ".deb" | grep linux64 | head -n 1 | cut -d '"' -f 2)
-    fi
-    rm /tmp/gh-release.html
-    wget -c "https://github.com/${DEB}"
-  done
-fi
-
-if [ ! -z "${_ingredients_dist}" ] ; then
-  rm status 2>/dev/null || true
-  generate_status
-
-  # Some packages depend on packages which we do not want to bundle,
-  # in addition to the global excludes defined in excludedeblist.
-  # Use
-  # ingredients:
-  #   exclude:
-  #     - packagename
-  if [ ! -z "${_ingredients_exclude[0]}" ] ; then
-    for PACKAGE in "${_ingredients_exclude[@]}" ; do
-      printf "Package: $PACKAGE\nStatus: install ok installed\nArchitecture: all\nVersion: 9:999.999.999\n\n" >> status
-    done
-  fi
-
-  # Some packages depend on an exact version of a dependency to be installed.
-  # Use
-  # ingredients:
-  #   pretend:
-  #     - packagename version_to_be_pretended
-  if [ ! -z "${_ingredients_pretend[0]}" ] ; then
-    for PRETEND in "${_ingredients_pretend[@]}" ; do
-      P_PKG=$(echo "$PRETEND" | cut -d " " -f 1)
-      P_VER=$(echo "$PRETEND" | cut -d " " -f 2)
-      cat status | tr '\n' '@' | sed -e 's|@@|\n\n|g' | sed -e 's|Package: '"$P_PKG"'@Status: install ok installed@Architecture: all@Version: 9:999.999.999|Package: '"$P_PKG"'@Status: install ok installed@Architecture: all@Version: '"$P_VER"'|g' | sed -e 's|@|\n|g' > status.temp
-      mv status.temp status
-    done
-  fi
-
-  if [ -e sources.list ] ; then
-    rm sources.list
-  fi
-  for PPA in "${_ingredients_ppas[@]}" ; do
-    echo "deb http://ppa.launchpad.net/${PPA}/ubuntu/ ${_ingredients_dist} main" >> sources.list
-  done
-  for SOURCE in "${_ingredients_sources[@]}" ; do
-    echo "${SOURCE}" >> sources.list
-  done
-  for DEBFILE in "${_ingredients_debs[@]}" ; do
-    cp ${DEBFILE} .
-  done
-  # Use libcurl-slim to reduce AppImage size, thanks darealshinji
-  # Not really compiled on xenial but CentOS 6, https://github.com/AppImage/AppImages/issues/187
-  echo "deb http://ppa.launchpad.net/djcj/libcurl-slim/ubuntu xenial main" >> sources.list
-  # Use gnutls-patched to have libgnutls look in various distributions' places for certificates,
-  # https://github.com/darealshinji/vlc-AppImage/issues/1#issuecomment-321041496
-  # echo "deb http://ppa.launchpad.net/djcj/gnutls-patched/ubuntu ${_ingredients_dist} main" >> sources.list
-  ### echo "deb http://ppa.launchpad.net/djcj/gnutls-patched/ubuntu trusty main" >> sources.list # https://github.com/AppImage/pkg2appimage/issues/345
-fi
-
 if [ ! -z "${_ingredients_script[0]}" ] ; then
   # Execute extra steps defined in recipe
   shell_execute $YAMLFILE _ingredients_script
-fi
-
-if [ ! -z "${_ingredients_dist}" ] ; then
-  # Some projects provide raw .deb files without a repository
-  # hence we create our own local repository as part of
-  # the AppImage creation process in order to "install"
-  # the package using apt-get as normal
-  if [ ! -z "${_ingredients_debs[0]}" ] ; then
-    for DEB in "${_ingredients_debs[@]}" ; do
-      if [ ! -f $(basename "$DEB") ] ; then
-        wget -c $DEB
-      fi
-    done
-  fi
-  scanpackages | gzip -9c > Packages.gz
-  echo "deb file:$(readlink -e $PWD) ./" >> sources.list
-
-  INSTALL=$LOWERAPP
-  if [ ! -z "${_ingredients_package}" ] ; then
-    INSTALL="${_ingredients_package}"
-  fi
-  if [ ! -z "${_ingredients_packages}" ] ; then
-    INSTALL=""
-  fi
-
-  # If packages are specifically listed, only install these, not a package with the name of the app
-  if [ ! -z "${_ingredients_packages[0]}" ] ; then
-    INSTALL=${_ingredients_packages[@]}
-  fi
-
-#  apt-get -o Acquire::AllowInsecureRepositories=true -o Acquire::Languages="none" -o Acquire::AllowDowngradeToInsecureRepositories=true $OPTIONS update || true
-#  URLS=$(apt-get --allow-unauthenticated -o Apt::Get::AllowUnauthenticated=true $OPTIONS -y install --print-uris $INSTALL | cut -d "'" -f 2 | grep -e "^http") || true
-#  if which aria2c &>/dev/null; then
-#    dltool=aria2c
-#  else
-#    dltool=wget
-#  fi
-
-#  $dltool -c -i- <<<"$URLS"
-  set +x
-  apt-get.update
-
-  INSTALL=$(echo "${INSTALL}" | sed "s| |\n|g")
-
-  for pkg in ${INSTALL}; do
-    apt-get.do-download ${pkg}
-  done
-  set -x
 fi
 
 if [ ! -z "${_ingredients_post_script[0]}" ] ; then
@@ -303,7 +170,6 @@ mkdir -p ./$APP.AppDir/
 cd ./$APP.AppDir/
 
 mkdir -p usr/bin usr/lib
-find ../*.deb -exec dpkg-deb -X {} . \; || true
 
 unset LD_PRELOAD
 
@@ -321,7 +187,7 @@ find . -path *icons* -path *512* -name "*$LOWERAPP*" -exec cp {} usr/share/icons
 get_icon
 
 if [ -z "${_union}" ] ; then
-  get_apprun
+  cp ../../AppRun* ./AppRun
 else
 cat > AppRun <<\EOF
 #!/bin/sh
@@ -339,8 +205,10 @@ export QT_PLUGIN_PATH="${HERE}"/usr/lib/qt4/plugins/:"${HERE}"/usr/lib/i386-linu
 EXEC=$(grep -e '^Exec=.*' "${HERE}"/*.desktop | head -n 1 | cut -d "=" -f 2- | sed -e 's|%.||g')
 exec ${EXEC} "$@"
 EOF
-chmod a+x AppRun
 fi
+
+chmod a+x ./AppRun
+
 
 get_desktop
 

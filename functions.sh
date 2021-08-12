@@ -10,7 +10,7 @@
 # by using:
 # export PKG2AICOMMIT=<git sha>
 if [ -z "$PKG2AICOMMIT" ] ; then
-  PKG2AICOMMIT=master
+  PKG2AICOMMIT=local
 fi
 
 # Options for apt-get to use local files rather than the system ones
@@ -59,15 +59,6 @@ case "$(uname -i)" in
     exit 1;;
 esac
 
-# Either get the file from remote or from a static place.
-# critical for builds without network access like in Open Build Service
-cat_file_from_url()
-{
-  cat_excludelist="wget -q $1 -O -"
-  [ -e "$STATIC_FILES/${1##*/}" ] && cat_excludelist="cat $STATIC_FILES/${1##*/}"
-  $cat_excludelist
-}
-
 git_pull_rebase_helper()
 {
   git reset --hard HEAD
@@ -80,14 +71,6 @@ git_pull_rebase_helper()
 patch_usr()
 {
   find usr/ -type f -executable -exec sed -i -e "s|/usr|././|g" {} \;
-}
-
-# Download AppRun and make it executable
-get_apprun()
-{
-  TARGET_ARCH=${ARCH:-$SYSTEM_ARCH}
-  wget -c https://github.com/AppImage/AppImageKit/releases/download/continuous/AppRun-${TARGET_ARCH} -O AppRun
-  chmod a+x AppRun
 }
 
 # Copy the library dependencies of all exectuable files in the current directory
@@ -118,7 +101,7 @@ move_lib()
 # Delete blacklisted files
 delete_blacklisted()
 {
-  BLACKLISTED_FILES=$(cat_file_from_url https://github.com/AppImage/pkg2appimage/raw/${PKG2AICOMMIT}/excludelist | sed 's|#.*||g')
+  BLACKLISTED_FILES=$( cat excludelist | sed 's|#.*||g')
   echo $BLACKLISTED_FILES
 
   local DOT_DIR=$(readlink -f .)
@@ -164,11 +147,6 @@ get_desktopintegration()
 # Generate AppImage; this expects $ARCH, $APP and $VERSION to be set
 generate_appimage()
 {
-  # Download AppImageAssistant
-  URL="https://github.com/AppImage/AppImageKit/releases/download/6/AppImageAssistant_6-${SYSTEM_ARCH}.AppImage"
-  wget -c "$URL" -O AppImageAssistant
-  chmod a+x ./AppImageAssistant
-
   # if [[ "$RECIPE" == *ecipe ]] ; then
   #   echo "#!/bin/bash -ex" > ./$APP.AppDir/Recipe
   #   echo "# This recipe was used to generate this AppImage." >> ./$APP.AppDir/Recipe
@@ -217,8 +195,7 @@ generate_type2_appimage()
   #   URL=$(wget -q "https://s3.amazonaws.com/archive.travis-ci.org/jobs/$((ID+2))/log.txt" -O - | grep "https://transfer.sh/.*/appimagetool" | tail -n 1 | sed -e 's|\r||g')
   # fi
   if [ -z "$(which appimagetool)" ] ; then
-    URL="https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-${SYSTEM_ARCH}.AppImage"
-    wget -c "$URL" -O appimagetool
+    cp ../appimagetool* ./appimagetool
     chmod a+x ./appimagetool
     appimagetool=$(readlink -f appimagetool)
   else
@@ -250,47 +227,15 @@ generate_type2_appimage()
   _APP_DIR="${PWD}/$APP.AppDir/"
   export OWD="${PWD}"
    
-  if ( [ ! -z "$KEY" ] ) && ( ! -z "$TRAVIS" ) ; then
-    wget https://github.com/AppImage/AppImageKit/files/584665/data.zip -O data.tar.gz.gpg
-    ( set +x ; echo $KEY | gpg2 --batch --passphrase-fd 0 --no-tty --skip-verify --output data.tar.gz --decrypt data.tar.gz.gpg )
-    tar xf data.tar.gz
-    sudo chown -R $USER .gnu*
-    mv $HOME/.gnu* $HOME/.gnu_old ; mv .gnu* $HOME/
-    if [ -z "$RECIPE" ] ; then
-      VERSION=$VERSION_EXPANDED "$appimagetool" $@ -n -s -g -v "${_APP_DIR}"
-    else
-      VERSION=$VERSION_EXPANDED "$appimagetool" $@ -n -s --bintray-user $BINTRAY_USER --bintray-repo $BINTRAY_REPO -v "${_APP_DIR}"
-    fi
+
+  if [ -z "$RECIPE" ] ; then
+    VERSION=$VERSION_EXPANDED "$appimagetool" $@ -n -g -v "${_APP_DIR}"
   else
-    if [ -z "$RECIPE" ] ; then
-      VERSION=$VERSION_EXPANDED "$appimagetool" $@ -n -g -v "${_APP_DIR}"
-    else
-      VERSION=$VERSION_EXPANDED "$appimagetool" $@ -n --bintray-user $BINTRAY_USER --bintray-repo $BINTRAY_REPO -v "${_APP_DIR}"
-    fi
+    VERSION=$VERSION_EXPANDED "$appimagetool" $@ -n --bintray-user $BINTRAY_USER --bintray-repo $BINTRAY_REPO -v "${_APP_DIR}"
   fi
   set -x
   mkdir -p ../out/ || true
   mv *.AppImage* ../out/
-}
-
-# Generate status file for use by apt-get; assuming that the recipe uses no newer
-# ingredients than what would require more recent dependencies than what we assume
-# to be part of the base system
-generate_status()
-{
-  mkdir -p ./tmp/archives/
-  mkdir -p ./tmp/lists/partial
-  touch tmp/pkgcache.bin tmp/srcpkgcache.bin
-  if [ -e "${HERE}/usr/share/pkg2appimage/excludedeblist" ]  ; then
-    EXCLUDEDEBLIST="${HERE}/usr/share/pkg2appimage/excludedeblist"
-  else
-    wget -q -c "https://github.com/AppImage/AppImages/raw/${PKG2AICOMMIT}/excludedeblist"
-    EXCLUDEDEBLIST=excludedeblist
-  fi
-  rm status 2>/dev/null || true
-  for PACKAGE in $(cat "$EXCLUDEDEBLIST" | cut -d "#" -f 1) ; do
-    printf "Package: $PACKAGE\nStatus: install ok installed\nArchitecture: all\nVersion: 9:999.999.999\n\n" >> status
-  done
 }
 
 # Find the desktop file and copy it to the AppDir
@@ -369,61 +314,4 @@ patch_strings_in_file() {
             fi
         done
     fi
-}
-
-# Lightweight bash-only "apt update" and "apt download" replacement
-
-function apt-get.update(){
-  echo -n > cache.txt
-  
-  cat Packages.gz | gunzip -c | grep -E "^Package:|^Filename:|^Depends:|^Version:" >> cache.txt || true
-  
-  while read line; do
-    local line=$(echo "${line}" | sed 's|[[:space:]]| |g')
-    local repo_info=($(echo ${line} | tr " " "\n"))
-    local base_url=${repo_info[1]}
-    local dist_name=${repo_info[2]}
-  
-    for i in $(seq 3 $((${#repo_info[@]} - 1))); do
-      echo "Caching ${base_url} ${dist_name} ${repo_info[${i}]}..."
-      local repo_url="${base_url}/dists/${dist_name}/${repo_info[${i}]}/binary-amd64/Packages.gz"
-      wget -q "${repo_url}" -O - | gunzip -c | grep -E "^Package:|^Filename:|^Depends:|^Version:" | sed "s|^Filename: |Filename: ${base_url}/|g" >> cache.txt
-    done
-  done <sources.list
-}
-
-function apt-get.do-download(){
-  [ -f "status" ] && {
-    grep -q ^"Package: ${1}"$ status && return
-  }
-  
-  echo "${already_downloaded_package[@]}" | sed 's| |\n|g' | grep -q ^"${1}"$ && return
-  
-  already_downloaded_package+=(${1})
-   
-  local dependencies=($(cat cache.txt | grep -A 2 -m 1 ^"Package: ${1}"$    \
-                                      | grep ^"Depends: "                   \
-                                      | cut -c 9-                           \
-                                      | sed "s|([^)]*)||g;s|[[:space:]]||g" \
-                                      | sed "s|,|\n|g"                      \
-                                      | cut -d"|" -f1 ))
-
-  local package_url=$(cat cache.txt | grep -A 3 -m 1 ^"Package: ${1}"$ \
-                                    | grep ^"Filename: "               \
-                                    | cut -c 11-)
-  
-   
-  [ ! -f "${package_url}" ] && {
-    [ ! "${package_url}" = "" ] && {
-      wget -c "${package_url}"
-    } || {
-      echo ${1} >> teste_123
-    }
-  }
-  
-  unset package_url
-  
-  for depend in "${dependencies[@]}"; do
-    apt-get.do-download ${depend}
-  done
 }
