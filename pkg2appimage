@@ -6,14 +6,6 @@ export PATH="${HERE}"/usr/bin/:"${HERE}"/usr/sbin/:"${HERE}"/usr/games/:"${HERE}
 export LD_LIBRARY_PATH="${HERE}"/usr/lib/:"${HERE}"/usr/lib/i386-linux-gnu/:"${HERE}"/usr/lib/x86_64-linux-gnu/:"${HERE}"/usr/lib32/:"${HERE}"/usr/lib64/:"${HERE}"/lib/:"${HERE}"/lib/i386-linux-gnu/:"${HERE}"/lib/x86_64-linux-gnu/:"${HERE}"/lib32/:"${HERE}"/lib64/:"${LD_LIBRARY_PATH}"
 export XDG_DATA_DIRS="${HERE}"/usr/share/:"${XDG_DATA_DIRS}"
 
-
-# Specify a certain commit if you do not want to use master
-# by using:
-# export PKG2AICOMMIT=<git sha>
-if [ -z "$PKG2AICOMMIT" ] ; then
-  PKG2AICOMMIT=master
-fi
-
 usage() {
   if [ -z "$APPIMAGE" ]  ; then
     MYSELF="$0"

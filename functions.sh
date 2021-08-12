@@ -1,18 +1,3 @@
-# This file is supposed to be sourced by each Recipe
-# that wants to use the functions contained herein
-# like so:
-# wget -q https://github.com/AppImage/AppImages/raw/${PKG2AICOMMIT}/functions.sh -O ./functions.sh
-# . ./functions.sh
-
-# RECIPE=$(realpath "$0")
-
-# Specify a certain commit if you do not want to use master
-# by using:
-# export PKG2AICOMMIT=<git sha>
-if [ -z "$PKG2AICOMMIT" ] ; then
-  PKG2AICOMMIT=local
-fi
-
 # Options for apt-get to use local files rather than the system ones
 OPTIONS="-o Debug::NoLocking=1
 -o APT::Cache-Limit=125829120
