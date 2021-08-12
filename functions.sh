@@ -1,19 +1,3 @@
-# Options for apt-get to use local files rather than the system ones
-OPTIONS="-o Debug::NoLocking=1
--o APT::Cache-Limit=125829120
--o Dir::Etc::sourcelist=./sources.list
--o Dir::State=./tmp
--o Dir::Cache=./tmp
--o Dir::State::status=./status
--o Dir::Etc::sourceparts=-
--o APT::Get::List-Cleanup=0
--o APT::Get::AllowUnauthenticated=1
--o Debug::pkgProblemResolver=true
--o Debug::pkgDepCache::AutoInstall=true
--o APT::Install-Recommends=0
--o APT::Install-Suggests=0
-"
-
 # Detect if we are running inside Docker
 grep docker /proc/1/cgroup >/dev/null && export DOCKER_BUILD=1 || true
 
@@ -43,12 +27,6 @@ case "$(uname -i)" in
     echo "Unsupported system architecture"
     exit 1;;
 esac
-
-git_pull_rebase_helper()
-{
-  git reset --hard HEAD
-  git pull
-}
 
 # Patch /usr to ././ in ./usr
 # to make the contents of usr/ relocateable
@@ -127,41 +105,6 @@ get_desktopintegration()
   # chmod a+x ./usr/bin/$REALBIN.wrapper
   echo "The desktopintegration script is deprecated. Please advise users to use https://github.com/AppImage/appimaged instead."
   # sed -i -e "s|^Exec=$REALBIN|Exec=$REALBIN.wrapper|g" $1.desktop
-}
-
-# Generate AppImage; this expects $ARCH, $APP and $VERSION to be set
-generate_appimage()
-{
-  # if [[ "$RECIPE" == *ecipe ]] ; then
-  #   echo "#!/bin/bash -ex" > ./$APP.AppDir/Recipe
-  #   echo "# This recipe was used to generate this AppImage." >> ./$APP.AppDir/Recipe
-  #   echo "# See http://appimage.org for more information." >> ./$APP.AppDir/Recipe
-  #   echo "" >> ./$APP.AppDir/Recipe
-  #   cat $RECIPE >> ./$APP.AppDir/Recipe
-  # fi
-  #
-  # Detect the architecture of what we are packaging.
-  # The main binary could be a script, so let's use a .so library
-  BIN=$(find . -name *.so* -type f | head -n 1)
-  INFO=$(file "$BIN")
-  if [ -z $ARCH ] ; then
-    if [[ $INFO == *"x86-64"* ]] ; then
-      ARCH=x86_64
-    elif [[ $INFO == *"i686"* ]] ; then
-      ARCH=i686
-    elif [[ $INFO == *"armv6l"* ]] ; then
-      ARCH=armhf
-    else
-      echo "Could not automatically detect the architecture."
-      echo "Please set the \$ARCH environment variable."
-     exit 1
-    fi
-  fi
-
-  mkdir -p ../out || true
-  rm ../out/$APP"-"$VERSION".glibc"$GLIBC_NEEDED"-"$ARCH".AppImage" 2>/dev/null || true
-  GLIBC_NEEDED=$(glibc_needed)
-  ./AppImageAssistant ./$APP.AppDir/ ../out/$APP"-"$VERSION".glibc"$GLIBC_NEEDED"-"$ARCH".AppImage"
 }
 
 # Generate AppImage type 2

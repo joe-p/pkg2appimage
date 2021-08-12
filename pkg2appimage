@@ -6,20 +6,6 @@ export PATH="${HERE}"/usr/bin/:"${HERE}"/usr/sbin/:"${HERE}"/usr/games/:"${HERE}
 export LD_LIBRARY_PATH="${HERE}"/usr/lib/:"${HERE}"/usr/lib/i386-linux-gnu/:"${HERE}"/usr/lib/x86_64-linux-gnu/:"${HERE}"/usr/lib32/:"${HERE}"/usr/lib64/:"${HERE}"/lib/:"${HERE}"/lib/i386-linux-gnu/:"${HERE}"/lib/x86_64-linux-gnu/:"${HERE}"/lib32/:"${HERE}"/lib64/:"${LD_LIBRARY_PATH}"
 export XDG_DATA_DIRS="${HERE}"/usr/share/:"${XDG_DATA_DIRS}"
 
-usage() {
-  if [ -z "$APPIMAGE" ]  ; then
-    MYSELF="$0"
-  else
-    MYSELF="$APPIMAGE"
-  fi
-  echo "usage:"
-  echo "  $MYSELF [--di] META-NAME|YAMLFILE"
-  echo ""
-  echo "options:"
-  echo "  --di    enable legacy desktop integration (unsupported)"
-  exit 1
-}
-
 check_dependencies() {
   for executable in $@; do
     which "${executable}" >/dev/null 2>&1 || {
@@ -27,19 +13,6 @@ check_dependencies() {
     }
   done
 }
-
-if [ $# -eq 0 ] || [ "x${!#}" = "x--di" ] ; then
-  usage
-fi
-if [ $# -eq 2 ] && [ "x$1" != "x--di" ] ; then
-  usage
-fi
-
-if [ "x$1" = "x--di" ] ; then
-  ENABLE_DI="yes"
-else
-  ENABLE_DI="no"
-fi
 
 # Halt on errors
 set -e
@@ -57,19 +30,6 @@ check_dependencies \
 
 
 YAMLFILE=$(readlink -f "${!#}")
-
-
-# Lightweight bash-only dpkg-scanpackages replacement
-scanpackages() {
-  for deb in *.deb ; do
-    dpkg -I $deb | sed 's/^ *//g' | grep -i -E '(package|version|installed-size|architecture|depends|priority):'
-    echo "Filename: $(readlink -f $deb)"
-    echo "MD5sum: $(md5sum -b $deb | cut -d' ' -f1)"
-    echo "SHA1: $(sha1sum -b $deb | cut -d' ' -f1)"
-    echo "SHA256: $(sha256sum -b $deb | cut -d' ' -f1)"
-    echo
-  done
-}
 
 # Function to parse yaml
 # https://gist.github.com/epiloque/8cf512c6d64641bde388
@@ -98,10 +58,6 @@ parse_yaml() {
 # Read yaml file
 parse_yaml $YAMLFILE "_"
 eval $(parse_yaml $YAMLFILE "_")
-
-if [ ! -z $_enable_di ]; then
-    ENABLE_DI="$_enable_di"
-fi
 
 # Execute multiple script lines together as one
 # shell_execute filename key_of_group_of_commands
@@ -137,16 +93,6 @@ else
   fi
 fi
 
-# If there is an ARCH environment variable, then use that
-# architecture to for apt-get. Not that for the AppImage to be
-# operable, we also need to embed a matching AppImage runtime
-# and ingredients of that architecture. Debian packages
-# should be available for most architectures, e.g., oldstable
-# has "armhf"
-if [ ! -z "$ARCH" ] ; then
-  OPTIONS="$OPTIONS -o APT::Architecture=$ARCH"
-fi
-
 if [ ! -z "${_ingredients_script[0]}" ] ; then
   # Execute extra steps defined in recipe
   shell_execute $YAMLFILE _ingredients_script
@@ -177,29 +123,8 @@ find . -path *icons* -path *512* -name "*$LOWERAPP*" -exec cp {} usr/share/icons
 
 get_icon
 
-if [ -z "${_union}" ] ; then
-  cp ../../AppRun* ./AppRun
-else
-cat > AppRun <<\EOF
-#!/bin/sh
-HERE="$(dirname "$(readlink -f "${0}")")"
-export UNION_PRELOAD="${HERE}"
-export LD_PRELOAD="${HERE}/libunionpreload.so"
-export PATH="${HERE}"/usr/bin/:"${HERE}"/usr/sbin/:"${HERE}"/usr/games/:"${HERE}"/bin/:"${HERE}"/sbin/:"${PATH}"
-export LD_LIBRARY_PATH="${HERE}"/usr/lib/:"${HERE}"/usr/lib/i386-linux-gnu/:"${HERE}"/usr/lib/x86_64-linux-gnu/:"${HERE}"/usr/lib32/:"${HERE}"/usr/lib64/:"${HERE}"/lib/:"${HERE}"/lib/i386-linux-gnu/:"${HERE}"/lib/x86_64-linux-gnu/:"${HERE}"/lib32/:"${HERE}"/lib64/:"${LD_LIBRARY_PATH}"
-export PYTHONPATH="${HERE}"/usr/share/pyshared/:"${PYTHONPATH}"
-export PYTHONHOME="${HERE}"/usr/
-export XDG_DATA_DIRS="${HERE}"/usr/share/:"${XDG_DATA_DIRS}"
-export PERLLIB="${HERE}"/usr/share/perl5/:"${HERE}"/usr/lib/perl5/:"${PERLLIB}"
-export GSETTINGS_SCHEMA_DIR="${HERE}"/usr/share/glib-2.0/schemas/:"${GSETTINGS_SCHEMA_DIR}"
-export QT_PLUGIN_PATH="${HERE}"/usr/lib/qt4/plugins/:"${HERE}"/usr/lib/i386-linux-gnu/qt4/plugins/:"${HERE}"/usr/lib/x86_64-linux-gnu/qt4/plugins/:"${HERE}"/usr/lib32/qt4/plugins/:"${HERE}"/usr/lib64/qt4/plugins/:"${HERE}"/usr/lib/qt5/plugins/:"${HERE}"/usr/lib/i386-linux-gnu/qt5/plugins/:"${HERE}"/usr/lib/x86_64-linux-gnu/qt5/plugins/:"${HERE}"/usr/lib32/qt5/plugins/:"${HERE}"/usr/lib64/qt5/plugins/:"${QT_PLUGIN_PATH}"
-EXEC=$(grep -e '^Exec=.*' "${HERE}"/*.desktop | head -n 1 | cut -d "=" -f 2- | sed -e 's|%.||g')
-exec ${EXEC} "$@"
-EOF
-fi
-
+cp ../../AppRun* ./AppRun
 chmod a+x ./AppRun
-
 
 get_desktop
 
@@ -265,18 +190,6 @@ DESKTOP=$(find . -name '*.desktop' | sort | head -n 1)
 # keys although the format definition says that they are optional
 fix_desktop "$DESKTOP"
 
-# Some non-distribution provided applications have an absolute
-# path in the Exec= line which we remove for relocateability
-if [ -z "$DESKTOP" ] ; then
-  echo "desktop file not found, aborting"
-  exit 1
-else
-  desktop-file-validate "$DESKTOP" || exit 1
-  ORIG=$(grep -o "^Exec=.*$" "${DESKTOP}" | head -n 1| cut -d " " -f 1)
-  REPL=$(basename $(grep -o "^Exec=.*$" "${DESKTOP}" | head -n 1 | cut -d " " -f 1 | sed -e 's|Exec=||g'))
-  sed -i -e 's|'"${ORIG}"'|Exec='"${REPL}"'|g' "${DESKTOP}"
-fi
-
 # Compile GLib schemas if the subdirectory is present in the AppImage
 # AppRun has to export GSETTINGS_SCHEMA_DIR for this to work
 if [ -d usr/share/glib-2.0/schemas/ ] ; then
@@ -297,40 +210,20 @@ if [ ! -z "${_binpatch}" ] ; then
 fi
 
 # Don't suffer from NIH; use LD_PRELOAD to override calls to /usr paths
-if [ ! -z "${_union}" ] ; then
-  mkdir -p usr/src/
-  wget -q "https://raw.githubusercontent.com/mikix/deb2snap/master/src/preload.c" -O - | \
-  sed -e 's|SNAPPY|UNION|g' | sed -e 's|SNAPP|UNION|g' | sed  -e 's|SNAP|UNION|g' | \
-  sed -e 's|snappy|union|g' > usr/src/libunionpreload.c
-  gcc -shared -fPIC usr/src/libunionpreload.c -o libunionpreload.so -ldl -DUNION_LIBNAME=\"libunionpreload.so\"
-  strip libunionpreload.so
-fi
+mkdir -p usr/src/
+wget -q "https://raw.githubusercontent.com/mikix/deb2snap/master/src/preload.c" -O - | \
+sed -e 's|SNAPPY|UNION|g' | sed -e 's|SNAPP|UNION|g' | sed  -e 's|SNAP|UNION|g' | \
+sed -e 's|snappy|union|g' > usr/src/libunionpreload.c
+gcc -shared -fPIC usr/src/libunionpreload.c -o libunionpreload.so -ldl -DUNION_LIBNAME=\"libunionpreload.so\"
+strip libunionpreload.so
 
 delete_blacklisted
-
-if [ "$ENABLE_DI" = "yes" ] ; then
-  get_desktopintegration $LOWERAPP
-fi
 
 # Fix desktop files that have file endings for icons
 sed -i -e 's|\.png||g' *.desktop || true
 sed -i -e 's|\.svg||g' *.desktop || true
 sed -i -e 's|\.svgz||g' *.desktop || true
 sed -i -e 's|\.xpm||g' *.desktop || true
-
-# Setting PYTHONHOME instead
-# Fix Python imports,
-# https://github.com/AppImage/AppImages/issues/172
-# SITECUSTOMIZEFILES=$(find . -name "sitecustomize.py")
-# for SITECUSTOMIZEFILE in $SITECUSTOMIZEFILES ; do
-# rm $SITECUSTOMIZEFILE # Remove symlinks, replace by files
-# cat > $SITECUSTOMIZEFILE <<\EOF
-# import sys,os
-# if sys.version_info[0] < 3:
-#     prefix = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(sys.path[0]))))
-#     sys.path = [ prefix+s for s in sys.path if not s.startswith(prefix) ]
-# EOF
-# done
 
 # Execute extra steps defined in recipe
 if [ ! -z "${_post_script[0]}" ] ; then
