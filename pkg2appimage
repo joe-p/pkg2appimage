@@ -48,7 +48,6 @@ set -x
 # Check dependencies
 check_dependencies \
   convert \
-  wget \
   grep \
   sed \
   cut \
