@@ -123,7 +123,7 @@ generate_type2_appimage()
   #   URL=$(wget -q "https://s3.amazonaws.com/archive.travis-ci.org/jobs/$((ID+2))/log.txt" -O - | grep "https://transfer.sh/.*/appimagetool" | tail -n 1 | sed -e 's|\r||g')
   # fi
   if [ -z "$(which appimagetool)" ] ; then
-    cp ../appimagetool* ./appimagetool
+    cp ../../appimagetool-${SYSTEM_ARCH}.AppImage ./appimagetool
     chmod a+x ./appimagetool
     appimagetool=$(readlink -f appimagetool)
   else
