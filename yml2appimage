@@ -198,7 +198,7 @@ get_icon()
 }
 
 # transfer.sh
-transfer() { if [ $# -eq 0 ]; then echo "No arguments specified. Usage:\necho transfer /tmp/test.md\ncat /tmp/test.md | transfer test.md"; return 1; fi
+transfer() { if [ $# -eq 0 ]; then echo "No arguments specified. Usage:\necho transfer ./tmp/test.md\ncat ./tmp/test.md | transfer test.md"; return 1; fi
 tmpfile=$( mktemp -t transferXXX ); if tty -s; then basefile=$(basename "$1" | sed -e 's/[^a-zA-Z0-9._-]/-/g'); curl --progress-bar --upload-file "$1" "https://transfer.sh/$basefile" >> $tmpfile; else curl --progress-bar --upload-file "-" "https://transfer.sh/$1" >> $tmpfile ; fi; cat $tmpfile; rm -f $tmpfile; }
 
 # Patch binary files; fill with padding if replacement is shorter than original
@@ -289,14 +289,14 @@ eval $(parse_yaml $YAMLFILE "_")
 # Execute multiple script lines together as one
 # shell_execute filename key_of_group_of_commands
 shell_execute() {
-  if [ -f /tmp/recipe_script ] ; then
-    rm /tmp/recipe_script
+  if [ -f ./tmp/recipe_script ] ; then
+    rm ./tmp/recipe_script
   fi
-  parse_yaml $YAMLFILE "_" | grep "^$2+=" > /tmp/recipe_script
-  sed -i -e 's|^'$2'+=("||g' /tmp/recipe_script
-  sed -i -e 's|")$||g' /tmp/recipe_script
-  bash -ex /tmp/recipe_script
-  rm /tmp/recipe_script
+  parse_yaml $YAMLFILE "_" | grep "^$2+=" > ./tmp/recipe_script
+  sed -i -e 's|^'$2'+=("||g' ./tmp/recipe_script
+  sed -i -e 's|")$||g' ./tmp/recipe_script
+  bash -ex ./tmp/recipe_script
+  rm ./tmp/recipe_script
 }
 
 APP=$_app
