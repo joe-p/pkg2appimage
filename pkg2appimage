@@ -196,11 +196,8 @@ if [ -d usr/share/glib-2.0/schemas/ ] ; then
   ( cd usr/share/glib-2.0/schemas/ ; glib-compile-schemas . )
 fi
 
-if [ -f ../VERSION ] ; then
-  VERSION=$(cat ../VERSION)
-else
-  get_version || true
-fi
+VERSION=$(cat ../VERSION)
+
 
 # patch_usr
 # Patching only the executable files seems not to be enough for some apps

@@ -190,17 +190,6 @@ get_icon()
   ls -lh $LOWERAPP.png || true
 }
 
-# Find out the version
-get_version()
-{
-  THEDEB=$(find ../*.deb -name $LOWERAPP"_*" | head -n 1)
-  if [ -z "$THEDEB" ] ; then
-    echo "Version could not be determined from the .deb; you need to determine it manually"
-  fi
-  VERSION=$(echo $THEDEB | cut -d "~" -f 1 | cut -d "_" -f 2 | cut -d "-" -f 1 | sed -e 's|1%3a||g' | sed -e 's|.dfsg||g' )
-  echo $VERSION
-}
-
 # transfer.sh
 transfer() { if [ $# -eq 0 ]; then echo "No arguments specified. Usage:\necho transfer /tmp/test.md\ncat /tmp/test.md | transfer test.md"; return 1; fi
 tmpfile=$( mktemp -t transferXXX ); if tty -s; then basefile=$(basename "$1" | sed -e 's/[^a-zA-Z0-9._-]/-/g'); curl --progress-bar --upload-file "$1" "https://transfer.sh/$basefile" >> $tmpfile; else curl --progress-bar --upload-file "-" "https://transfer.sh/$1" >> $tmpfile ; fi; cat $tmpfile; rm -f $tmpfile; }
