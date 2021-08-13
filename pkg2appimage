@@ -179,8 +179,8 @@ generate_type2_appimage()
     VERSION=$VERSION_EXPANDED "$appimagetool" $@ -n --bintray-user $BINTRAY_USER --bintray-repo $BINTRAY_REPO -v "${_APP_DIR}"
   fi
   set -x
-  mkdir -p ../out/ || true
-  mv *.AppImage* ../out/
+  mkdir -p ../../out/ || true
+  mv *.AppImage* ../../out/
 }
 
 # Find the desktop file and copy it to the AppDir
@@ -465,4 +465,4 @@ else
   generate_type2_appimage -u "${_updateinformation}"
 fi
 
-ls -lh ../out/*.AppImage
+ls -lh ../../out/*.AppImage
