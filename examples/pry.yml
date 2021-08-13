@@ -6,6 +6,7 @@ ingredients:
     - wget -c https://github.com/AppImage/AppImageKit/releases/download/13/appimagetool-x86_64.AppImage
     - wget -c https://github.com/AppImage/AppImageKit/releases/download/13/AppRun-x86_64
     - wget -c https://raw.githubusercontent.com/AppImage/pkg2appimage/master/excludelist
+    
     # download pre-built ruby binaries from rvm.io
     - wget -c https://rvm.io/binaries/ubuntu/20.04/x86_64/ruby-2.6.6.tar.bz2
 
