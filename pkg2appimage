@@ -180,7 +180,7 @@ generate_type2_appimage()
   fi
   set -x
   mkdir -p ../../out/ || true
-  mv *.AppImage* ../../out/
+  mv ${APP}*.AppImage ../../out/
 }
 
 # Find the desktop file and copy it to the AppDir
