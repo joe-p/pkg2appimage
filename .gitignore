@@ -1,3 +1,9 @@
+out/
+work/
+./*.yml
+appimagetool*
+AppRun*
+
 # Object files
 *.o
 *.ko
