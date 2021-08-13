@@ -1,6 +1,6 @@
 out/
 work/
-*.yml
+./*.yml
 appimagetool*
 AppRun*
 
