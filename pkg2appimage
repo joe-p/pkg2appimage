@@ -81,7 +81,8 @@ move_lib()
 # Delete blacklisted files
 delete_blacklisted()
 {
-  BLACKLISTED_FILES=$( cat ../../../excludelist | sed 's|#.*||g' | sed -e '/^$/d')
+  BLACKLISTED_FILES=$( cat ../excludelist | sed 's|#.*||g' | sed -e '/^$/d')
+  
   echo $BLACKLISTED_FILES
 
   local DOT_DIR=$(readlink -f .)
@@ -140,9 +141,8 @@ generate_type2_appimage()
   #   URL=$(wget -q "https://s3.amazonaws.com/archive.travis-ci.org/jobs/$((ID+2))/log.txt" -O - | grep "https://transfer.sh/.*/appimagetool" | tail -n 1 | sed -e 's|\r||g')
   # fi
   if [ -z "$(which appimagetool)" ] ; then
-    cp ../../appimagetool-${SYSTEM_ARCH}.AppImage ./appimagetool
-    chmod a+x ./appimagetool
-    appimagetool=$(readlink -f appimagetool)
+    chmod a+x ./appimagetool-${SYSTEM_ARCH}.AppImage
+    appimagetool=$(readlink -f ./appimagetool-${SYSTEM_ARCH}.AppImage)
   else
     appimagetool=$(which appimagetool)
   fi
@@ -352,7 +352,7 @@ find . -path *icons* -path *512* -name "*$LOWERAPP*" -exec cp {} usr/share/icons
 
 get_icon
 
-cp ../../../AppRun-${SYSTEM_ARCH} ./AppRun
+cp ../AppRun-${SYSTEM_ARCH} ./AppRun
 chmod a+x ./AppRun
 
 get_desktop
