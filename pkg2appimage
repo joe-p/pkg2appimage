@@ -81,7 +81,7 @@ move_lib()
 # Delete blacklisted files
 delete_blacklisted()
 {
-  BLACKLISTED_FILES=$( cat excludelist | sed 's|#.*||g')
+  BLACKLISTED_FILES=$( cat ../../../excludelist | sed 's|#.*||g' | sed -e '/^$/d')
   echo $BLACKLISTED_FILES
 
   local DOT_DIR=$(readlink -f .)
