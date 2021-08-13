@@ -122,14 +122,6 @@ glibc_needed()
 # will not be added to the AppImage filename
 generate_type2_appimage()
 {
-  # Get the ID of the last successful build on Travis CI
-  # ID=$(wget -q https://api.travis-ci.org/repos/AppImage/appimagetool/builds -O - | head -n 1 | sed -e 's|}|\n|g' | grep '"result":0' | head -n 1 | sed -e 's|,|\n|g' | grep '"id"' | cut -d ":" -f 2)
-  # Get the transfer.sh URL from the logfile of the last successful build on Travis CI
-  # Only Travis knows why build ID and job ID don't match and why the above doesn't give both...
-  # URL=$(wget -q "https://s3.amazonaws.com/archive.travis-ci.org/jobs/$((ID+1))/log.txt" -O - | grep "https://transfer.sh/.*/appimagetool" | tail -n 1 | sed -e 's|\r||g')
-  # if [ -z "$URL" ] ; then
-  #   URL=$(wget -q "https://s3.amazonaws.com/archive.travis-ci.org/jobs/$((ID+2))/log.txt" -O - | grep "https://transfer.sh/.*/appimagetool" | tail -n 1 | sed -e 's|\r||g')
-  # fi
   if [ -z "$(which appimagetool)" ] ; then
     chmod a+x ./appimagetool-${SYSTEM_ARCH}.AppImage
     appimagetool=$(readlink -f ./appimagetool-${SYSTEM_ARCH}.AppImage)
@@ -429,9 +421,9 @@ fi
 
 # Don't suffer from NIH; use LD_PRELOAD to override calls to /usr paths
 mkdir -p usr/src/
-wget -q "https://raw.githubusercontent.com/mikix/deb2snap/master/src/preload.c" -O - | \
-sed -e 's|SNAPPY|UNION|g' | sed -e 's|SNAPP|UNION|g' | sed  -e 's|SNAP|UNION|g' | \
-sed -e 's|snappy|union|g' > usr/src/libunionpreload.c
+cat ../preload.c | \
+  sed -e 's|SNAPPY|UNION|g' | sed -e 's|SNAPP|UNION|g' | sed  -e 's|SNAP|UNION|g' | \
+  sed -e 's|snappy|union|g' > usr/src/libunionpreload.c
 gcc -shared -fPIC usr/src/libunionpreload.c -o libunionpreload.so -ldl -DUNION_LIBNAME=\"libunionpreload.so\"
 strip libunionpreload.so
 
